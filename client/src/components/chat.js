@@ -3,7 +3,6 @@ import styled from "styled-components";
 import io from "socket.io-client";
 import Picker from "emoji-picker-react";
 import Image from "./Image";
-import Poll from "./Poll";
 
 const Page = styled.div`
   display: flex;
@@ -111,7 +110,7 @@ const Chat = () => {
   const [message, setMessage] = useState("");
 
   const [serviceList, setServiceList] = useState([{ service: "" }]);
-  const [switchs, setSwitch] = useState(true);
+  const [question, setQuestion] = useState("");
 
   const socketRef = useRef();
 
@@ -127,28 +126,37 @@ const Chat = () => {
       receivedMessage(message);
     });
   }, []);
-
+  // commmunication b/w user
   function receivedMessage(message) {
     setMessages((oldMsgs) => [...oldMsgs, message]);
+    // type is toggle then find message with keyid and toggle
   }
+
+  //add question
+  const handleQuestion = (e) => {
+    setQuestion(e.target.value);
+  };
+
   // add value to poll
   const handleServiceChange = (e, index) => {
     const { name, value } = e.target;
     const list = [...serviceList];
     list[index][name] = value;
     setServiceList(list);
-    setMessage(e.target.value);
+    console.log(serviceList);
+    // setMessage(e.target.value);
   };
+
   // remove a option
   const handleServiceRemove = (index) => {
     const list = [...serviceList];
     list.splice(index, 1);
     setServiceList(list);
   };
+
   // update the state for new value
   const handleServiceAdd = () => {
     setServiceList([...serviceList, { service: "" }]);
-    setMessage([...serviceList, { service: "" }]);
   };
 
   //send message to backend
@@ -166,17 +174,36 @@ const Chat = () => {
       setMessage("");
       socketRef.current.emit("send message", messageObject);
     }
-    if (message) {
+    const messageObject = {
+      id: yourID,
+      type: "text",
+      body: message,
+    };
+    setMessage("");
+    setChosenEmoji("");
+    socketRef.current.emit("send message", messageObject);
+  }
+
+  // send question & options
+  function sendQuestion(e) {
+    const messageObject = {
+      id: yourID,
+      type: "text",
+      body: question,
+    };
+    setMessage("");
+    setChosenEmoji("");
+    socketRef.current.emit("send message", messageObject);
+    serviceList.map((singleService) => {
       const messageObject = {
         id: yourID,
-        type: "text",
-        body: message,
+        type: "option",
+        body: singleService.service,
       };
-      setMessage("");
-      setChosenEmoji("");
       socketRef.current.emit("send message", messageObject);
-    }
+    });
   }
+
   // for message
   function handleChange(e) {
     setMessage(e.target.value);
@@ -198,6 +225,13 @@ const Chat = () => {
     }
   };
 
+  // save poll value
+  function savePoll(e) {
+    e.preventDefault();
+    setMessage(question);
+    sendQuestion(e);
+  }
+
   function renderMessages(message, index) {
     if (message.type === "file") {
       const blob = new Blob([message.body], { type: message.type });
@@ -215,7 +249,7 @@ const Chat = () => {
       );
     }
 
-    if (switchs === true) {
+    if (message.type === "text") {
       if (message.id === yourID) {
         return (
           <MyRow key={index}>
@@ -233,28 +267,18 @@ const Chat = () => {
       message.type = "checkbox";
       return (
         <MyRow key={index}>
-          <MyMessage>
-            <input type="checkbox" /> {message.body}
-          </MyMessage>
+          <input type="checkbox" />
+          <MyMessage>{message.body}</MyMessage>
         </MyRow>
       );
     }
     message.type = "checkbox";
     return (
       <PartnerRow key={index}>
-        <PartnerMessage>
-          <input type="checkbox" />
-          {message.body}
-        </PartnerMessage>
+        <PartnerMessage>{message.body}</PartnerMessage>
+        <input type="checkbox" />
       </PartnerRow>
     );
-  }
-
-  function changeType() {
-    setSwitch(false);
-  }
-  function changeBack() {
-    setSwitch(true);
   }
 
   return (
@@ -316,7 +340,6 @@ const Chat = () => {
                   data-bs-target="#collapseExample"
                   aria-expanded="false"
                   aria-controls="collapseExample"
-                  onClick={changeType}
                 >
                   Create select
                 </button>
@@ -326,11 +349,11 @@ const Chat = () => {
           <div class="collapse" id="collapseExample">
             <div class="card card-body">
               <input
-                type="text"
-                value={message}
-                onChange={handleChange}
-                placeholder="Enter your question"
+                value={question}
+                onChange={handleQuestion}
+                placeholder="Your question.."
               />
+
               {/* POll feature */}
 
               <form autoComplete="off">
@@ -375,7 +398,7 @@ const Chat = () => {
                 data-bs-toggle="collapse"
                 data-bs-target="#collapseExample"
                 aria-expanded="false"
-                onClick={sendMessage}
+                onClick={savePoll}
               >
                 Save
               </button>
