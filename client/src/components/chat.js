@@ -3,6 +3,7 @@ import styled from "styled-components";
 import io from "socket.io-client";
 import Picker from "emoji-picker-react";
 import Image from "./Image";
+import { v4 as uuid } from "uuid";
 
 const Page = styled.div`
   display: flex;
@@ -102,22 +103,23 @@ const PartnerMessage = styled.div`
 `;
 
 const Chat = () => {
-  const [chosenEmoji, setChosenEmoji] = useState("");
-  const [file, setFile] = useState();
+  const [chosenEmoji, setChosenEmoji] = useState(""); // input emoji
+  const [file, setFile] = useState(); // image
 
-  const [yourID, setYourID] = useState();
-  const [messages, setMessages] = useState([]);
-  const [message, setMessage] = useState("");
+  const [yourID, setYourID] = useState(); // user ID
+  const [messages, setMessages] = useState([]); // store chat
+  const [message, setMessage] = useState(""); // input text
 
-  const [serviceList, setServiceList] = useState([{ service: "" }]);
-  const [question, setQuestion] = useState("");
+  const [serviceList, setServiceList] = useState([{ service: "" }]); // option input
+  const [question, setQuestion] = useState(""); // question input
 
   const socketRef = useRef();
 
   useEffect(() => {
-    socketRef.current = io.connect("/");
+    socketRef.current = io.connect("/"); // connection to server
 
     socketRef.current.on("your id", (id) => {
+      // get id
       setYourID(id);
     });
 
@@ -126,25 +128,44 @@ const Chat = () => {
       receivedMessage(message);
     });
   }, []);
-  // commmunication b/w user
+  // commmunication b/w user / stores all chat data
   function receivedMessage(message) {
     setMessages((oldMsgs) => [...oldMsgs, message]);
-    // type is toggle then find message with keyid and toggle
   }
+
+  // for message
+  function handleChange(e) {
+    setMessage(e.target.value);
+  }
+  // set file
+  function selectFile(e) {
+    setMessage(e.target.files[0].name); // to show file name
+    setFile(e.target.files[0]);
+  }
+
+  // set emoji in message
+  const onEmojiClick = (event, emojiObject) => {
+    setChosenEmoji(emojiObject);
+    if (chosenEmoji === "") {
+      setMessage(message);
+    } else {
+      setMessage(message.concat(chosenEmoji.emoji)); // emoji + text
+      setQuestion(question.concat(chosenEmoji.emoji));
+    }
+  };
 
   //add question
   const handleQuestion = (e) => {
     setQuestion(e.target.value);
   };
 
-  // add value to poll
+  // add value to option
   const handleServiceChange = (e, index) => {
     const { name, value } = e.target;
     const list = [...serviceList];
     list[index][name] = value;
     setServiceList(list);
     console.log(serviceList);
-    // setMessage(e.target.value);
   };
 
   // remove a option
@@ -169,6 +190,7 @@ const Chat = () => {
         body: file,
         mimeType: file.type, // file type png jpg
         fileName: file.name,
+        key: uuid(),
       };
       setFile();
       setMessage("");
@@ -178,6 +200,7 @@ const Chat = () => {
       id: yourID,
       type: "text",
       body: message,
+      key: uuid(),
     };
     setMessage("");
     setChosenEmoji("");
@@ -186,52 +209,30 @@ const Chat = () => {
 
   // send question & options
   function sendQuestion(e) {
+    e.preventDefault();
     const messageObject = {
       id: yourID,
       type: "text",
       body: question,
+      key: uuid(),
     };
     setMessage("");
     setChosenEmoji("");
+    setQuestion("");
     socketRef.current.emit("send message", messageObject);
     serviceList.map((singleService) => {
       const messageObject = {
         id: yourID,
         type: "option",
         body: singleService.service,
+        key: uuid(),
       };
+      setServiceList([{ service: "" }]);
       socketRef.current.emit("send message", messageObject);
     });
   }
 
-  // for message
-  function handleChange(e) {
-    setMessage(e.target.value);
-  }
-  // set file
-  function selectFile(e) {
-    setMessage(e.target.files[0].name);
-    setFile(e.target.files[0]);
-  }
-
-  // set emoji in message
-  const onEmojiClick = (event, emojiObject) => {
-    setChosenEmoji(emojiObject);
-    // setMessage(oldMsgss => [...oldMsgss, chosenEmoji.emoji]);
-    if (chosenEmoji === "") {
-      setMessage(message);
-    } else {
-      setMessage(message.concat(chosenEmoji.emoji));
-    }
-  };
-
-  // save poll value
-  function savePoll(e) {
-    e.preventDefault();
-    setMessage(question);
-    sendQuestion(e);
-  }
-
+  // display content
   function renderMessages(message, index) {
     if (message.type === "file") {
       const blob = new Blob([message.body], { type: message.type });
@@ -264,19 +265,31 @@ const Chat = () => {
       );
     }
     if (message.id === yourID) {
-      message.type = "checkbox";
       return (
         <MyRow key={index}>
-          <input type="checkbox" />
+          <input type="checkbox" checked={message.defaultChecked} />
           <MyMessage>{message.body}</MyMessage>
         </MyRow>
       );
     }
-    message.type = "checkbox";
     return (
       <PartnerRow key={index}>
         <PartnerMessage>{message.body}</PartnerMessage>
-        <input type="checkbox" />
+        <input
+          type="checkbox"
+          onChange={(e) => {
+            // console.log(e.target.checked);
+            if (e.target.checked === true) {
+              const messageObject = {
+                id: yourID,
+                type: "text",
+                body: message.body,
+                key: message.key,
+              };
+              socketRef.current.emit("send message", messageObject);
+            }
+          }}
+        />
       </PartnerRow>
     );
   }
@@ -398,7 +411,7 @@ const Chat = () => {
                 data-bs-toggle="collapse"
                 data-bs-target="#collapseExample"
                 aria-expanded="false"
-                onClick={savePoll}
+                onClick={sendQuestion}
               >
                 Save
               </button>
