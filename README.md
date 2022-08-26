@@ -1,3 +1,8 @@
-﻿# chat-box
-install emoji picker : npm i emoji-picker-react;
-install bootstrap : npm install react-bootstrap bootstrap;
+﻿# chat-box 
+ Chat Application includes emoji, can send image.
+ 
+install emoji picker : npm i emoji-picker-react
+
+install bootstrap : npm install react-bootstrap bootstrap
+
+
